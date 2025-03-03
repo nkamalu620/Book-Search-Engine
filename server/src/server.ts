@@ -1,10 +1,38 @@
 import express from 'express';
 import path from 'node:path';
+import { ApolloServer } from '@apollo/server';
+import { expressMiddleware } from '@apollo/server/express4';
+import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
+import { makeExecutableSchema } from '@graphql-tools/schema';
+import http from 'http';
 import db from './config/connection.js';
 import routes from './routes/index.js';
+import typeDefs from './graphql/typeDefs.js';
+import resolvers from './graphql/resolvers';
+import { authenticateToken } from './services/auth.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+const httpServer = http.createServer(app);
+
+const schema = makeExecutableSchema({ typeDefs, resolvers });
+
+const server = new ApolloServer({
+  schema,
+  plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
+});
+
+await server.start();
+
+app.use(
+  '/graphql',
+  express.json(),
+  authenticateToken,
+  expressMiddleware(server, {
+    context: async ({ req }) => ({ user: req.user }),
+  })
+);
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
