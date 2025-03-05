@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { Container, Card, Button, Row, Col } from 'react-bootstrap';
 import { useQuery, useMutation } from '@apollo/client';
 import { GET_ME } from '../utils/queries';
@@ -24,15 +23,15 @@ const SavedBooks = () => {
       return false;
     }
 
-    try {
-      const response = await removeBook(bookId, token);
+    try try {
+      const { data } = await removeBook({
+        variables: { bookId },
+      });
 
-      if (!response.ok) {
+      if (!data) {
         throw new Error('something went wrong!');
       }
 
-      const updatedUser = await response.json();
-      setUserData(updatedUser);
       // upon success, remove book's id from localStorage
       removeBookId(bookId);
     } catch (err) {
