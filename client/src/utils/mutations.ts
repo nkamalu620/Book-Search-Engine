@@ -23,6 +23,7 @@ export const ADD_USER = gql`
         email
       }
   }
+}
 `;
 
 export const SAVE_BOOK = gql`
