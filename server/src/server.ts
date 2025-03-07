@@ -6,9 +6,7 @@ import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHt
 import { makeExecutableSchema } from '@graphql-tools/schema';
 import http from 'http';
 import db from './config/connection.js';
-import routes from './routes/index.js';
-import typeDefs from './graphql/typeDefs.js';
-import resolvers from './graphql/resolvers';
+import {typeDefs, resolvers} from './schemas/index.js'
 import { authenticateToken } from './services/auth.js';
 
 const app = express();
@@ -41,8 +39,6 @@ app.use(express.json());
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/build')));
 }
-
-app.use(routes);
 
 db.once('open', () => {
   app.listen(PORT, () => console.log(`🌍 Now listening on localhost:${PORT}`));
