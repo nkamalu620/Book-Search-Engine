@@ -1,5 +1,5 @@
-import Book from '../models/Book.js';
-import User from '../models/User.js';
+import {Book, User} from '../models/index.js';
+
 
 interface BookArgs {
   bookId: string;
