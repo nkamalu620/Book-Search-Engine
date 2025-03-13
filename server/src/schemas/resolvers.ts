@@ -1,4 +1,5 @@
-import {Book, User} from '../models/index.js';
+import { User } from '../models/index.js';
+import { signToken, AuthenticationError } from '../utils/auth.js';
 
 
 interface BookArgs {
@@ -6,79 +7,57 @@ interface BookArgs {
 }
 
 interface AddBookArgs {
-title: string;
-author: string;
+  title: string;
+  author: string;
+  description: string;
+  bookId: string;
+  image: string;
+  link: string;
 }
 
 interface UserArgs {
- userId: string;
+  userId: string;
 }
 
 interface AddUserArgs {
- username: string;
- email: string;
+  input: {
+    username: string;
+    email: string;
+    password: string;
+  }
+}
+
+interface LoginUserArgs {
+  email: string;
+  password: string;
 }
 
 const resolvers = {
   Query: {
-    books: async () => {
-      try {
-        return await Book.find();
-      } catch (error) {
-        if (error instanceof Error) {
-          throw new Error(`Failed to fetch books: ${error.message}`);
-        } else {
-          throw new Error('Failed to fetch books: Unknown error');
-        }
+    me: async (_parent: any, _args: any, context: any) => {
+      if (context.user) {
+        const userData = await User.findOne({ _id: context.user._id })
+          .select('-__v -password')
+          .populate('savedBooks');
+        return userData;
       }
-    },
-    book: async (_parent: any, { bookId }: BookArgs) => {
-      try {
-        return await Book.findOne({ _id: bookId });
-      } catch (error) {
-        if (error instanceof Error) {
-          throw new Error(`Failed to fetch book: ${error.message}`);
-        } else {
-          throw new Error('Failed to fetch book: Unknown error');
-        }
-      }
-    },
-    users: async () => {
-      try {
-        return await User.find();
-      } catch (error) {
-        if (error instanceof Error) {
-          throw new Error(`Failed to fetch users: ${error.message}`);
-        } else {
-          throw new Error('Failed to fetch users: Unknown error');
-        }
-      }
-    },
-    user: async (_parent: any, { userId }: UserArgs) => {
-      try {
-        return await User.findOne({ _id: userId });
-      } catch (error) {
-        if (error instanceof Error) {
-          throw new Error(`Failed to fetch user: ${error.message}`);
-        } else {
-          throw new Error('Failed to fetch user: Unknown error');
-        }
-      }
+      throw new AuthenticationError('Could not authenticate user.');
     },
   },
 
   // Important for useMutation: The resolver matches the typeDefs entry point and informs the request of the relevant data
   Mutation: {
-    addBook: async (_parent: any, { title, author }: AddBookArgs) => {
-      try {
-        return await Book.create({ title, author });
-      } catch (error) {
-        if (error instanceof Error) {
-          throw new Error(`Failed to add book: ${error.message}`);
-        } else {
-          throw new Error('Failed to add book: Unknown error');
-        }
+    addBook: async (_parent: any, { input }: AddBookArgs, context: any) => {
+      if (context.user) {
+
+       const updatedUserBook = await User.findOneAndUpdate(
+          { _id: context.user._id },
+          { $addToSet: { savedBooks: input } }
+        );
+        return updatedUserBook;
       }
+      throw AuthenticationError;
+      ('You need to be logged in!');
     },
     removeBook: async (_parent: any, { bookId }: BookArgs) => {
       try {
@@ -91,29 +70,42 @@ const resolvers = {
         }
       }
     },
-    addUser: async (_parent: any, { username, email }: AddUserArgs) => {
-      try {
-        return await User.create({ username, email });
-      } catch (error) {
-        if (error instanceof Error) {
-          throw new Error(`Failed to add user: ${error.message}`);
-        } else {
-          throw new Error('Failed to add user: Unknown error');
-        }
-      }
+    addUser: async (_parent: any, { input }: AddUserArgs) => {
+      // Create a new user with the provided username, email, and password
+      const user = await User.create({ ...input });
+
+      // Sign a token with the user's information
+      const token = signToken(user.username, user.email, user._id);
+
+      // Return the token and the user
+      return { token, user };
     },
-    removeUser: async (_parent: any, { userId }: UserArgs) => {
-      try {
-        return await User.findOneAndDelete({ _id: userId });
-      } catch (error) {
-        if (error instanceof Error) {
-          throw new Error(`Failed to remove user: ${error.message}`);
-        } else {
-          throw new Error('Failed to remove user: Unknown error');
-        }
+
+
+    login: async (_parent: any, { email, password }: LoginUserArgs) => {
+      // Find a user with the provided email
+      const user = await User.findOne({ email });
+
+      // If no user is found, throw an AuthenticationError
+      if (!user) {
+        throw new AuthenticationError('Could not authenticate user.');
       }
+
+      // Check if the provided password is correct
+      const correctPw = await user.isCorrectPassword(password);
+
+      // If the password is incorrect, throw an AuthenticationError
+      if (!correctPw) {
+        throw new AuthenticationError('Could not authenticate user.');
+      }
+
+      // Sign a token with the user's information
+      const token = signToken(user.username, user.email, user._id);
+
+      // Return the token and the user
+      return { token, user };
     },
-  },
+  }
 };
 
 export default resolvers;
